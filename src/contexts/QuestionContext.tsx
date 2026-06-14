@@ -9,6 +9,7 @@ export interface QuestionState {
   questions: QuestionFormValues[];
   savedQuestions: Question[];
   currentIndex: number;
+  confirmedIndices: Set<number>;
   isLoading: boolean;
   error: string | null;
 }
@@ -60,6 +61,7 @@ const initialState: QuestionState = {
   questions: [{ ...emptyQuestion }],
   savedQuestions: [],
   currentIndex: 0,
+  confirmedIndices: new Set<number>(),
   isLoading: false,
   error: null,
 };
@@ -68,8 +70,18 @@ const initialState: QuestionState = {
 
 export function questionReducer(state: QuestionState, action: QuestionAction): QuestionState {
   switch (action.type) {
-    case 'SET_CURRENT_INDEX':
-      return { ...state, currentIndex: action.payload };
+    case 'SET_CURRENT_INDEX': {
+      // Mark the previous question as confirmed if it has content
+      const prevIndex = state.currentIndex;
+      const prevQuestion = state.questions[prevIndex];
+      const newConfirmed = new Set(state.confirmedIndices);
+      if (prevQuestion && prevQuestion.question.trim() !== '' &&
+          prevQuestion.option1.trim() !== '' && prevQuestion.option2.trim() !== '' &&
+          prevQuestion.option3.trim() !== '' && prevQuestion.option4.trim() !== '') {
+        newConfirmed.add(prevIndex);
+      }
+      return { ...state, currentIndex: action.payload, confirmedIndices: newConfirmed };
+    }
 
     case 'UPDATE_QUESTION':
       return {
@@ -97,6 +109,7 @@ export function questionReducer(state: QuestionState, action: QuestionAction): Q
         ...state,
         questions,
         currentIndex: 0,
+        confirmedIndices: new Set<number>(),
       };
     }
 
@@ -104,9 +117,11 @@ export function questionReducer(state: QuestionState, action: QuestionAction): Q
       const { questions: existingQuestions, totalSlots } = action.payload;
       // Fill slots: existing questions first, then empty slots for remaining
       const filledQuestions: QuestionFormValues[] = [];
+      const loadedConfirmed = new Set<number>();
       for (let i = 0; i < totalSlots; i++) {
         if (i < existingQuestions.length) {
           filledQuestions.push(existingQuestions[i]);
+          loadedConfirmed.add(i);
         } else {
           filledQuestions.push({ ...emptyQuestion });
         }
@@ -115,16 +130,42 @@ export function questionReducer(state: QuestionState, action: QuestionAction): Q
         ...state,
         questions: filledQuestions,
         currentIndex: 0,
+        confirmedIndices: loadedConfirmed,
         isLoading: false,
       };
     }
 
-    case 'IMPORT_FROM_CSV':
+    case 'IMPORT_FROM_CSV': {
+      // Fill slots starting from currentIndex, overwriting empty or current slot
+      const updatedQuestions = [...state.questions];
+      let insertIndex = state.currentIndex;
+      
+      for (const csvQuestion of action.payload) {
+        if (insertIndex < updatedQuestions.length) {
+          updatedQuestions[insertIndex] = csvQuestion;
+          insertIndex++;
+        } else {
+          // No more slots — stop importing
+          break;
+        }
+      }
+
+      // Mark CSV-imported slots as confirmed
+      const csvConfirmed = new Set(state.confirmedIndices);
+      updatedQuestions.forEach((q, i) => {
+        if (q.question.trim() !== '' && q.option1.trim() !== '' &&
+            q.option2.trim() !== '' && q.option3.trim() !== '' && q.option4.trim() !== '') {
+          csvConfirmed.add(i);
+        }
+      });
+
       return {
         ...state,
-        questions: [...state.questions, ...action.payload],
-        currentIndex: state.questions.length,
+        questions: updatedQuestions,
+        currentIndex: state.currentIndex,
+        confirmedIndices: csvConfirmed,
       };
+    }
 
     case 'DELETE_CURRENT_EDITS':
       return {

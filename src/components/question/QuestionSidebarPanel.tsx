@@ -4,7 +4,7 @@ import { useQuestion } from '../../contexts/QuestionContext';
 import { useTest } from '../../contexts/TestContext';
 
 const QuestionSidebarPanel: React.FC = () => {
-  const { state: questionState, setCurrentIndex, isQuestionComplete } = useQuestion();
+  const { state: questionState, setCurrentIndex } = useQuestion();
   const { state: testState } = useTest();
   const { currentTest } = testState;
 
@@ -27,9 +27,8 @@ const QuestionSidebarPanel: React.FC = () => {
 
       <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
         {Array.from({ length: totalQuestions }, (_, index) => {
-          const isComplete = index < totalFromState
-            ? isQuestionComplete(index)
-            : index < savedCount;
+          const isComplete = questionState.confirmedIndices.has(index) ||
+            (index < savedCount && index >= totalFromState);
           
           const isActive = index === questionState.currentIndex;
 

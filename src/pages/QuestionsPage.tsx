@@ -93,8 +93,14 @@ const QuestionsPage: React.FC = () => {
 
       try {
         const questions = await parseQuestionsCSV(file);
+        const availableSlots = questionState.questions.length - questionState.currentIndex;
+        const importCount = Math.min(questions.length, availableSlots);
         importFromCSV(questions);
-        toast.success(`Imported ${questions.length} questions from CSV`);
+        if (importCount < questions.length) {
+          toast.success(`Imported ${importCount} of ${questions.length} questions (${availableSlots} slots available)`);
+        } else {
+          toast.success(`Imported ${importCount} questions from CSV`);
+        }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Failed to parse CSV file';
         toast.error(message);
